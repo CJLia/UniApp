@@ -140,6 +140,23 @@ class IDataStore(ABC):
         """
         pass
 
+    @abstractmethod
+    def get_all_subjects(self):
+        """
+        Retrieves all available subject objects.
+
+        Returns:
+            list[Subject]: A list of all Subject objects.
+        """
+        pass
+    
+    @abstractmethod
+    def clear_all_data(self):
+        """
+        Completely clears all student data from the data store.
+        This is an administrative function.
+        """
+        pass
 # --- Enrolment Service Interface ---
 class IEnrolmentService(ABC):
     """

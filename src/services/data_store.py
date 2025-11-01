@@ -200,3 +200,58 @@ class FileDataStore(IDataStore):
             
             # Persist the change
             self.save_data()
+
+    def get_all_subjects(self):
+        """
+        Retrieves all subject objects from the in-memory cache.
+
+        Returns:
+            list[Subject]: A list of all Subject objects.
+        """
+        return self._data.get('subjects', [])
+
+    def clear_all_data(self):
+        """
+        Completely clears all student data from the data store.
+        This is an administrative function.
+        
+        It resets the 'users' list to only contain Admins.
+        """
+        # Get the current list of all users
+        all_users = self.get_all_users()
+        
+        # Create a new list containing ONLY Admin objects
+        # This uses a list comprehension
+        admin_users = [user for user in all_users if isinstance(user, Admin)]
+        
+        # Reset the 'users' list in the cache to the new list
+        self._data['users'] = admin_users
+        
+        # Persist this change to the file
+        self._save_data()
+
+
+    # --- Private Helper Methods ---
+    # This method is not part of the IDataStore 'contract'.
+    # It's a private utility method for this class only.
+    # The underscore '_' prefix indicates it is 'private'.
+
+    def _save_data(self):
+        """
+        Saves the current in-memory cache ('self._data')
+        to the pickle file.
+        
+        This is called by any method that modifies the
+        data (e.g., add_user, update_user).
+        """
+        try:
+            # Open the file in 'write binary' ('wb') mode
+            # This will create the file if it doesn't exist
+            # or overwrite it if it does.
+            with open(self._file_path, 'wb') as f:
+                # 'pickle.dump' serializes the 'self._data'
+                # object and writes it to the file 'f'.
+                pickle.dump(self._data, f)
+        except IOError as e:
+            # If the file cannot be written (e.g., permissions)
+            print(f"Error saving data to file: {e}")
