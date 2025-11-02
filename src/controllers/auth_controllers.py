@@ -112,4 +112,4 @@ class AuthController:
             return (None, str(e))
         except Exception as e:
             # Catch any other unexpected errors
-            return (None, "An unexpected error occurred: {err}".fomat(err=e))
+            return (None, "An unexpected error occurred: {err}".format(err=e))

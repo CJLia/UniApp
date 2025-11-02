@@ -191,7 +191,7 @@ class AuthService(IAuthService):
 
         # --- Creation Step 1: Generate New ID ---
         # Use the injected ID generator
-        new_id = self._id_generator.generate_student_id()
+        new_id = self._id_generator.generate_unique_id()
 
         # --- Creation Step 2: Hash Password ---
         new_password_hash = self._hash_password(password)

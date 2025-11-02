@@ -59,3 +59,62 @@ class DuplicateDataException(Exception):
     e.g., registering a user with an email that is already in use.
     """
     pass
+
+# --- ADDED TO FIX IMPORT ERROR ---
+class DataPersistenceException(Exception):
+    """
+    Base class for exceptions raised during data loading or saving.
+    This fixes the ImportError in data_store.py
+    """
+    pass
+
+# --- ADDED FROM YOUR REPO'S auth_service.py ---
+class EmailAlreadyExistsException(DuplicateDataException):
+    """
+    Raised when a user tries to register with an email that
+    is already in use.
+    """
+    pass
+
+class InvalidEmailException(ValidationException):
+    """
+    Raised when the email format is invalid.
+    """
+    pass
+
+class InvalidPasswordException(ValidationException):
+    """
+    Raised when the password does not meet strength requirements.
+    """
+    pass
+
+# --- ADDED FROM YOUR REPO'S enrolment_service.py ---
+class StudentNotFoundException(UserNotFoundException):
+    """
+    Raised when a student ID is not found.
+    """
+    pass
+
+class SubjectNotFoundException(Exception):
+    """
+    Raised when a subject code is not found.
+    """
+    pass
+
+class AlreadyEnrolledException(EnrolmentException):
+    """
+    Raised when a student is already enrolled in a subject.
+    """
+    pass
+
+class NotEnrolledException(EnrolmentException):
+    """
+    Raised when attempting to modify an enrolment that doesn't exist.
+    """
+    pass
+
+class InvalidMarkException(ValidationException):
+    """
+    Raised when a mark is outside the valid range (e.g., 0-100).
+    """
+    pass

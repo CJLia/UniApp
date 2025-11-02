@@ -81,12 +81,9 @@ class IDataStore(ABC):
         pass
 
     @abstractmethod
-    def save_data(self, data):
+    def save_data(self):
         """
         Saves all application data to the persistent store.
-
-        Args:
-            data (dict): The dictionary of data to save.
         """
         pass
 
@@ -139,16 +136,6 @@ class IDataStore(ABC):
             user_id (str): The ID of the user to delete.
         """
         pass
-
-    @abstractmethod
-    def get_all_subjects(self):
-        """
-        Retrieves all available subject objects.
-
-        Returns:
-            list[Subject]: A list of all Subject objects.
-        """
-        pass
     
     @abstractmethod
     def clear_all_data(self):
@@ -157,6 +144,7 @@ class IDataStore(ABC):
         This is an administrative function.
         """
         pass
+
 # --- Enrolment Service Interface ---
 class IEnrolmentService(ABC):
     """
@@ -166,16 +154,13 @@ class IEnrolmentService(ABC):
     """
 
     @abstractmethod
-    def enrol_student_in_subject(self, student_id, subject_id):
+    def enrol(self, student_id, subject_code):
         """
         Enrols a student in a specific subject.
 
         Args:
             student_id (str): The ID of the student.
-            subject_id (str): The ID of the subject.
-
-        Returns:
-            Enrolment: The new Enrolment object created.
+            subject_code (str): The ID of the subject.
 
         Raises:
             StudentNotFoundException: If the student ID is not found.
@@ -188,13 +173,13 @@ class IEnrolmentService(ABC):
         pass
 
     @abstractmethod
-    def withdraw_student_from_subject(self, student_id, subject_id):
+    def unenrol(self, student_id, subject_code):
         """
         Withdraws a student from a specific subject.
 
         Args:
             student_id (str): The ID of the student.
-            subject_id (str): The ID of the subject.
+            subject_code (str): The ID of the subject.
 
         Raises:
             StudentNotFoundException: If the student ID is not found.
@@ -205,13 +190,13 @@ class IEnrolmentService(ABC):
         pass
 
     @abstractmethod
-    def set_mark_for_enrolment(self, student_id, subject_id, mark):
+    def set_mark(self, student_id, subject_code, mark):
         """
         Sets the numerical mark for a student's enrolment.
 
         Args:
             student_id (str): The ID of the student.
-            subject_id (str): The ID of the subject.
+            subject_code (str): The ID of the subject.
             mark (int): The numerical mark (e.g., 0-100).
 
         Raises:
@@ -219,6 +204,22 @@ class IEnrolmentService(ABC):
             SubjectNotFoundException: ...
             NotEnrolledException: ...
             InvalidMarkException: If the mark is outside the valid range.
+        """
+        pass
+
+    @abstractmethod
+    def change_password(self, user_id, new_password):
+        """
+        Changes a user's password.
+
+        Args:
+            user_id (str): The ID of the user.
+            new_password (str): The new plain-text password.
+            
+        Raises:
+            StudentNotFoundException: If the user ID is invalid.
+            InvalidPasswordException: If the new password is not
+                                      strong enough.
         """
         pass
 
@@ -231,20 +232,7 @@ class IReportingService(ABC):
     """
 
     @abstractmethod
-    def get_student_enrolments(self, student_id):
-        """
-        Gets a detailed list of a single student's enrolments.
-
-        Args:
-            student_id (str): The ID of the student.
-
-        Returns:
-            list: A list of Enrolment objects for the student.
-        """
-        pass
-
-    @abstractmethod
-    def get_all_students_by_pass_fail(self):
+    def get_pass_fail_partition(self) -> dict:
         """
         Partitions all students into two groups: PASS and FAIL.
         A student is in FAIL if they have failed one or more subjects.
@@ -257,7 +245,7 @@ class IReportingService(ABC):
         pass
 
     @abstractmethod
-    def group_students_by_grade(self):
+    def get_grade_grouping(self) -> dict:
         """
         Groups all students based on their average grade.
 
@@ -267,16 +255,6 @@ class IReportingService(ABC):
         """
         pass
         
-    @abstractmethod
-    def get_all_students(self):
-        """
-        Gets a list of all registered students.
-
-        Returns:
-            list: A list of Student objects.
-        """
-        pass
-
 # --- Grade Policy Interface ---
 class IGradePolicy(ABC):
     """
