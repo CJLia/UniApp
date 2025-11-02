@@ -1,13 +1,17 @@
-"""
-This file contains the Enrolment Controller class.
+import sys
+import os
+from pathlib import Path
 
-The controller acts as an intermediary between the View layer
-(e.g., CLI or GUI) and the Service layer (e.g., EnrolmentService).
-It handles user input from the view, calls the appropriate
-service, and returns the result (or error) back to the view.
-"""
+try:
+    current_file = Path(__file__).resolve()
+    project_root = current_file.parent.parent.parent
+    if str(project_root) not in sys.path:
+        sys.path.insert(0, str(project_root))
+except (NameError, AttributeError):
+    cwd = Path(os.getcwd()).resolve()
+    if str(cwd) not in sys.path:
+        sys.path.insert(0, str(cwd))
 
-# Import the service interface it depends on
 from src.services.interfaces import IEnrolmentService
 
 # Import custom exceptions that it needs to catch

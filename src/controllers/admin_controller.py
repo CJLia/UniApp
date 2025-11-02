@@ -1,12 +1,17 @@
-"""
-Defines the Admin Controller.
+import sys
+import os
+from pathlib import Path
 
-This module contains the 'AdminController', which handles
-administrative tasks like removing students and
-clearing data.
-"""
+try:
+    current_file = Path(__file__).resolve()
+    project_root = current_file.parent.parent.parent
+    if str(project_root) not in sys.path:
+        sys.path.insert(0, str(project_root))
+except (NameError, AttributeError):
+    cwd = Path(os.getcwd()).resolve()
+    if str(cwd) not in sys.path:
+        sys.path.insert(0, str(cwd))
 
-# Import the 'contracts' for the services it uses
 from src.services.interfaces import IDataStore, IReportingService
 # Import models
 from src.models.student import Student

@@ -1,13 +1,17 @@
-"""
-This file contains the Reporting Controller class.
+import sys
+import os
+from pathlib import Path
 
-The controller acts as an intermediary between the Admin View layer
-(e.g., CLI or GUI) and the Reporting Service. Its primary role
-is to handle requests from the view, call the service to
-generate report data, and return that data to the view.
-"""
+try:
+    current_file = Path(__file__).resolve()
+    project_root = current_file.parent.parent.parent
+    if str(project_root) not in sys.path:
+        sys.path.insert(0, str(project_root))
+except (NameError, AttributeError):
+    cwd = Path(os.getcwd()).resolve()
+    if str(cwd) not in sys.path:
+        sys.path.insert(0, str(cwd))
 
-# Import the service interface it depends on
 from src.services.interfaces import IReportingService
 
 class ReportingController:
@@ -46,11 +50,12 @@ class ReportingController:
 
         Returns:
             dict: A dictionary with 'PASS' and 'FAIL' keys,
+            
                   each containing a list of Student objects.
         """
         try:
             # Delegate the report generation to the service layer
-            partitions = self._reporting_service.partition_by_status()
+            partitions = self._reporting_service.get_pass_fail_partition()
             return (partitions, None)
             
         except Exception as e:
@@ -71,7 +76,7 @@ class ReportingController:
         """
         try:
             # Delegate the report generation to the service layer
-            groups = self._reporting_service.group_by_grade()
+            groups = self._reporting_service.get_grade_grouping()
             return (groups, None)
             
         except Exception as e:

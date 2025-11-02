@@ -1,15 +1,19 @@
-"""
-This file contains the implementation of the IEnrolmentService interface.
+import sys
+import os
+from pathlib import Path
 
-This service class is responsible for all business logic related to
-student enrolments, such as adding or removing subjects, and
-managing profile changes like passwords.
-"""
+try:
+    current_file = Path(__file__).resolve()
+    project_root = current_file.parent.parent.parent
+    if str(project_root) not in sys.path:
+        sys.path.insert(0, str(project_root))
+except (NameError, AttributeError):
+    cwd = Path(os.getcwd()).resolve()
+    if str(cwd) not in sys.path:
+        sys.path.insert(0, str(cwd))
 
-# Import the 'hashlib' module for secure password hashing (SHA-256)
 import hashlib
 
-# Import the interfaces this class implements or depends on
 from src.services.interfaces import (
     IEnrolmentService,
     IDataStore,
@@ -119,7 +123,8 @@ class EnrolmentService(IEnrolmentService):
         """
         subjects = self._data_store.get_all_subjects()
         for subject in subjects:
-            if subject.code.lower() == subject_code.lower():
+            # Subject.id is actually the code (e.g., 'ICT101')
+            if subject.id.lower() == subject_code.lower():
                 return subject
         
         # If the loop finishes, no subject was found
@@ -150,20 +155,19 @@ class EnrolmentService(IEnrolmentService):
         subject = self._get_subject_by_code(subject_code)
 
         # --- Validation Step 2: Check Max Enrolment Limit ---
-        # The Student model's 'can_enrol' method encapsulates this rule
-        if not student.can_enrol():
+        if len(student.enrolments) >= Student.MAX_ENROLMENTS:
             raise MaxSubjectsExceededException(
                 "Student {id} has reached the maximum of 4 enrolments."
                 .format(id=student_id)
             )
 
         # --- Validation Step 3: Check if Already Enrolled ---
-        # The Student model's 'is_enrolled' method encapsulates this
-        if student.is_enrolled(subject_code):
-            raise AlreadyEnrolledException(
-                "Student {id} is already enrolled in {code}."
-                .format(id=student_id, code=subject_code)
-            )
+        for enrolment in student.enrolments:
+            if enrolment.subject.id.lower() == subject_code.lower():
+                raise AlreadyEnrolledException(
+                    "Student {id} is already enrolled in {code}."
+                    .format(id=student_id, code=subject_code)
+                )
 
         # --- Creation Step: Create new Enrolment ---
         # Note: The design requires a unique ID for enrolments.
@@ -181,13 +185,15 @@ class EnrolmentService(IEnrolmentService):
         )
 
         # --- Persistence Step 1: Update Student Model ---
-        # The Student's 'add_enrolment' method adds to its
-        # internal list
-        student.add_enrolment(new_enrolment)
+        # Use the Student's enrol method
+        student.enrol(new_enrolment)
 
         # --- Persistence Step 2: Save Student to Data Store ---
         # The entire updated student object is saved
         self._data_store.update_user(student)
+        
+        # Return the new enrolment as required by interface
+        return new_enrolment
 
     def unenrol(self, student_id, subject_code):
         """
@@ -208,16 +214,21 @@ class EnrolmentService(IEnrolmentService):
         student = self._get_student_by_id(student_id)
 
         # --- Validation Step 2: Check if Enrolled ---
-        if not student.is_enrolled(subject_code):
+        enrolled = False
+        for enrolment in student.enrolments:
+            if enrolment.subject.id.lower() == subject_code.lower():
+                enrolled = True
+                break
+        
+        if not enrolled:
             raise NotEnrolledException(
                 "Student {id} is not enrolled in {code}."
                 .format(id=student_id, code=subject_code)
             )
 
         # --- Persistence Step 1: Update Student Model ---
-        # The Student's 'remove_enrolment' method handles
-        # the removal from its internal list
-        student.remove_enrolment(subject_code)
+        # Use the Student's drop_subject method
+        student.drop_subject(subject_code)
 
         # --- Persistence Step 2: Save Student to Data Store ---
         self._data_store.update_user(student)
@@ -325,3 +336,28 @@ class EnrolmentService(IEnrolmentService):
 
         # --- Persistence Step 3: Save to Data Store ---
         self._data_store.update_user(student)
+    
+    # --- Interface Method Implementations ---
+    # These methods implement the abstract methods from IEnrolmentService
+    # using the existing methods but with different parameter names to match the interface
+    
+    def enrol_student_in_subject(self, student_id, subject_id):
+        """
+        Implements the abstract method from IEnrolmentService.
+        This is an alias for enrol() that uses subject_id instead of subject_code.
+        """
+        return self.enrol(student_id, subject_id)
+    
+    def withdraw_student_from_subject(self, student_id, subject_id):
+        """
+        Implements the abstract method from IEnrolmentService.
+        This is an alias for unenrol() that uses subject_id instead of subject_code.
+        """
+        self.unenrol(student_id, subject_id)
+    
+    def set_mark_for_enrolment(self, student_id, subject_id, mark):
+        """
+        Implements the abstract method from IEnrolmentService.
+        This is an alias for set_mark() that uses subject_id instead of subject_code.
+        """
+        self.set_mark(student_id, subject_id, mark)

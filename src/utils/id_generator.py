@@ -1,16 +1,19 @@
-"""
-Defines a utility class for generating unique,
-six-digit, zero-padded IDs.
+import sys
+import os
+from pathlib import Path
 
-This utility is "stateful," meaning it needs to know
-about all existing users to ensure the IDs it
-generates are not already in use.
-"""
+try:
+    current_file = Path(__file__).resolve()
+    project_root = current_file.parent.parent.parent
+    if str(project_root) not in sys.path:
+        sys.path.insert(0, str(project_root))
+except (NameError, AttributeError):
+    cwd = Path(os.getcwd()).resolve()
+    if str(cwd) not in sys.path:
+        sys.path.insert(0, str(cwd))
 
-# Import 'random' for generating random numbers
 import random
 
-# Import the 'contract' for the data store
 from src.services.interfaces import IDataStore
 
 class IdGenerator:

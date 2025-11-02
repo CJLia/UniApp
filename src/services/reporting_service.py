@@ -5,51 +5,103 @@ This service is responsible for aggregating and processing data
 to generate reports for administrators.
 """
 
-from src.services.interfaces import IReportingService, IDataStore, IGradePolicy
+import sys
+import os
+from pathlib import Path
+
+try:
+    current_file = Path(__file__).resolve()
+    project_root = current_file.parent.parent.parent
+    if str(project_root) not in sys.path:
+        sys.path.insert(0, str(project_root))
+except (NameError, AttributeError):
+    cwd = Path(os.getcwd()).resolve()
+    if str(cwd) not in sys.path:
+        sys.path.insert(0, str(cwd))
+
+from src.services.interfaces import IReportingService
+
+# Import models
 from src.models.student import Student
 from src.models.enrolment import Grade
 
+# Import exceptions
+from src.utils.exceptions import StudentNotFoundException
+
+
 class ReportingService(IReportingService):
     """
-    Implements the IReportingService for generating admin reports.
+    Implements the IReportingService interface.
+    
+    This service provides reporting functionality for student data,
+    including grouping and partitioning operations.
     
     Attributes:
         _data_store (IDataStore): A reference to the data store.
-        _grade_policy (IGradePolicy): A reference to the grade policy logic.
     """
-    def __init__(self, data_store: IDataStore, grade_policy: IGradePolicy):
+    
+    def __init__(self, data_store):
         """
         Initializes the ReportingService.
-
+        
         Args:
-            data_store: An object implementing the IDataStore interface.
-            grade_policy: An object implementing the IGradePolicy interface.
+            data_store (IDataStore): An object that implements IDataStore.
         """
         self._data_store = data_store
-        self._grade_policy = grade_policy
-
-    def _get_all_students(self) -> list[Student]:
+    
+    def _get_all_students(self):
         """Helper method to get only student users."""
         all_users = self._data_store.get_all_users()
         # Filter for Student instances
         return [user for user in all_users if isinstance(user, Student)]
-
-    def get_pass_fail_partition(self) -> dict[str, list[Student]]:
+    
+    def get_student_enrolments(self, student_id):
         """
-        Partitions all students into PASS and FAIL groups.
-        A student is 'FAIL' if they have one or more 'FL' grades.
-        A student is 'PASS' if they have no 'FL' grades.
-
+        Gets a detailed list of a single student's enrolments.
+        
+        Args:
+            student_id (str): The ID of the student.
+            
         Returns:
-            A dictionary: {'PASS': [Student, ...], 'FAIL': [Student, ...]}
+            list: A list of Enrolment objects for the student.
+            
+        Raises:
+            StudentNotFoundException: If the student ID is not found.
+        """
+        users = self._data_store.get_all_users()
+        
+        for user in users:
+            if isinstance(user, Student) and user.id == student_id:
+                return user.get_enrolments()
+        
+        raise StudentNotFoundException(
+            f"Student with ID '{student_id}' not found."
+        )
+    
+    def get_pass_fail_partition(self):
+        """
+        Partitions all students into two groups: PASS and FAIL.
+        A student is in FAIL if they have failed one or more subjects.
+        A student is in PASS if they have no failed subjects.
+        
+        Returns:
+            dict: A dictionary with 'PASS' and 'FAIL' keys,
+                  each containing a list of Student objects.
         """
         students = self._get_all_students()
         partitions = {'PASS': [], 'FAIL': []}
-
+        
         for student in students:
             has_failed = False
+            
+            # Check if student has any failed subjects
             for enrolment in student.get_enrolments():
-                if enrolment.grade == Grade.F: # Check against the Grade Enum
+                # Check by grade (Grade.F represents Fail)
+                if enrolment.grade == Grade.F:
+                    has_failed = True
+                    break
+                # Also check by mark if grade is not set but mark is
+                elif enrolment.mark is not None and enrolment.mark < 50:
                     has_failed = True
                     break
             
@@ -59,46 +111,62 @@ class ReportingService(IReportingService):
                 partitions['PASS'].append(student)
         
         return partitions
-
-    def get_grade_grouping(self) -> dict[str, list[Student]]:
+    
+    def get_grade_grouping(self):
         """
-        Groups students by their average grade.
+        Groups all students based on their average grade.
         
-        Calculates the average numerical mark for each student and
-        assigns them to a grade bracket (HD, D, C, P, F, N/A).
-
+        Students are grouped by their overall average grade:
+        - HD: Average >= 85
+        - DN: Average >= 75 and < 85
+        - CR: Average >= 65 and < 75
+        - PS: Average >= 50 and < 65
+        - F: Average < 50 or no marks
+        
         Returns:
-            A dictionary: {'HD': [Student, ...], 'D': [Student, ...], ...}
+            dict: A dictionary with grade names as keys,
+                  each containing a list of Student objects.
         """
         students = self._get_all_students()
-        # Use Grade enum values for keys for consistency
-        groups = {grade.name: [] for grade in Grade}
-        # Add 'N/A' for students with no marks
-        groups['N/A'] = []
-
-
+        
+        groups = {
+            'HD': [],
+            'DN': [],
+            'CR': [],
+            'PS': [],
+            'F': []
+        }
+        
         for student in students:
-            marks = []
-            for enrolment in student.get_enrolments():
-                if enrolment.mark is not None:
-                    marks.append(enrolment.mark)
+            # Calculate average mark
+            enrolments = student.get_enrolments()
+            marks = [e.mark for e in enrolments if e.mark is not None]
             
             if not marks:
-                # Student has no marks yet
-                groups['N/A'].append(student)
+                # No marks available, default to F
+                groups['F'].append(student)
             else:
-                # Calculate average mark
-                avg_mark = sum(marks) / len(marks)
-                # Get the grade for that average
-                grade_enum = self._grade_policy.get_grade_for_mark(avg_mark)
+                average = sum(marks) / len(marks)
                 
-                # Use the grade's *name* (e.g., 'HD') as the key
-                if grade_enum.name in groups:
-                    groups[grade_enum.name].append(student)
+                # Determine grade group based on average
+                if average >= 85:
+                    groups['HD'].append(student)
+                elif average >= 75:
+                    groups['DN'].append(student)
+                elif average >= 65:
+                    groups['CR'].append(student)
+                elif average >= 50:
+                    groups['PS'].append(student)
                 else:
-                    # Fallback for any unexpected grade
-                    groups['N/A'].append(student)
+                    groups['F'].append(student)
         
-        # Filter out empty groups for a cleaner report
-        final_groups = {key: val for key, val in groups.items() if val}
-        return final_groups
+        return groups
+    
+    def get_all_students(self):
+        """
+        Gets a list of all registered students.
+        
+        Returns:
+            list: A list of Student objects.
+        """
+        return self._get_all_students()

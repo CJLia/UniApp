@@ -1,14 +1,17 @@
-"""
-This file contains the Authentication Controller class.
+import sys
+import os
+from pathlib import Path
 
-The controller acts as an intermediary between the View layer
-(e..g, CLI or GUI) and the Service layer (e.g., AuthService).
-Its primary role is to handle user input from the view,
-call the appropriate service, and then return the result
-(or error) back to the view.
-"""
+try:
+    current_file = Path(__file__).resolve()
+    project_root = current_file.parent.parent.parent
+    if str(project_root) not in sys.path:
+        sys.path.insert(0, str(project_root))
+except (NameError, AttributeError):
+    cwd = Path(os.getcwd()).resolve()
+    if str(cwd) not in sys.path:
+        sys.path.insert(0, str(cwd))
 
-# Import the service interface it depends on
 from src.services.interfaces import IAuthService
 
 # Import custom exceptions that it needs to catch

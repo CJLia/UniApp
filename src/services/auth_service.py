@@ -1,15 +1,19 @@
-"""
-This file contains the implementation of the IAuthService interface.
+import sys
+import os
+from pathlib import Path
 
-This service class is responsible for all business logic related to
-user authentication, including registration and login. It encapsulates
-the logic for password hashing, validation, and user creation.
-"""
+try:
+    current_file = Path(__file__).resolve()
+    project_root = current_file.parent.parent.parent
+    if str(project_root) not in sys.path:
+        sys.path.insert(0, str(project_root))
+except (NameError, AttributeError):
+    cwd = Path(os.getcwd()).resolve()
+    if str(cwd) not in sys.path:
+        sys.path.insert(0, str(cwd))
 
-# Import the 'hashlib' module for secure password hashing (SHA-256)
 import hashlib
 
-# Import the interfaces this class implements or depends on
 from src.services.interfaces import IAuthService, IDataStore
 
 # Import the model this service will create

@@ -1,15 +1,18 @@
-"""
-This file defines the grading policy for the university.
+import sys
+import os
+from pathlib import Path
 
-It implements the IGradePolicy interface, ensuring that the
-application's business logic for grading is separated from other
-services. This is a good example of the 'Strategy' design pattern,
-where the specific algorithm (how to grade) can be swapped out.
-"""
+try:
+    current_file = Path(__file__).resolve()
+    project_root = current_file.parent.parent.parent
+    if str(project_root) not in sys.path:
+        sys.path.insert(0, str(project_root))
+except (NameError, AttributeError):
+    cwd = Path(os.getcwd()).resolve()
+    if str(cwd) not in sys.path:
+        sys.path.insert(0, str(cwd))
 
-# Import the interface being implemented
 from src.services.interfaces import IGradePolicy
-# Import the Grade enum from the models
 from src.models.enrolment import Grade
 
 # A concrete class 'DefaultGradePolicy' is created that

@@ -60,61 +60,61 @@ class DuplicateDataException(Exception):
     """
     pass
 
-# --- ADDED TO FIX IMPORT ERROR ---
+# Data persistence exceptions
 class DataPersistenceException(Exception):
     """
-    Base class for exceptions raised during data loading or saving.
-    This fixes the ImportError in data_store.py
+    Raised when an error occurs during file I/O operations
+    (e.g., reading from or writing to a data file).
     """
     pass
 
-# --- ADDED FROM YOUR REPO'S auth_service.py ---
-class EmailAlreadyExistsException(DuplicateDataException):
+# Specific validation errors
+class EmailAlreadyExistsException(ValidationException):
     """
-    Raised when a user tries to register with an email that
-    is already in use.
+    Raised when attempting to register with an email that already exists.
     """
     pass
 
 class InvalidEmailException(ValidationException):
     """
-    Raised when the email format is invalid.
+    Raised when an email format is invalid.
     """
     pass
 
 class InvalidPasswordException(ValidationException):
     """
-    Raised when the password does not meet strength requirements.
+    Raised when a password does not meet the required strength criteria.
     """
     pass
 
-# --- ADDED FROM YOUR REPO'S enrolment_service.py ---
-class StudentNotFoundException(UserNotFoundException):
+# Student and subject related exceptions
+class StudentNotFoundException(EnrolmentException):
     """
-    Raised when a student ID is not found.
+    Raised when a student ID cannot be found in the data store.
     """
     pass
 
-class SubjectNotFoundException(Exception):
+class SubjectNotFoundException(EnrolmentException):
     """
-    Raised when a subject code is not found.
+    Raised when a subject code cannot be found in the data store.
     """
     pass
 
 class AlreadyEnrolledException(EnrolmentException):
     """
-    Raised when a student is already enrolled in a subject.
+    Raised when a student attempts to enrol in a subject they are already enrolled in.
     """
     pass
 
 class NotEnrolledException(EnrolmentException):
     """
-    Raised when attempting to modify an enrolment that doesn't exist.
+    Raised when a student attempts to perform an operation on a subject
+    they are not enrolled in.
     """
     pass
 
-class InvalidMarkException(ValidationException):
+class InvalidMarkException(EnrolmentException):
     """
-    Raised when a mark is outside the valid range (e.g., 0-100).
+    Raised when a mark is outside the valid range (typically 0-100).
     """
     pass
