@@ -148,6 +148,21 @@ class Student(User):
             list: A list of Enrolment objects.
         """
         return self.enrolments
+    
+    def get_enrolment(self, subject_code):
+        """
+        Returns the specific Enrolment object for a given subject code.
+
+        Args:
+            subject_code (str): The ID/code of the subject (e.g., '101')
+
+        Returns:
+            Enrolment | None: The matching Enrolment object, or None if not found.
+        """
+        for enrolment in self.enrolments:
+            if enrolment.subject.id.lower() == subject_code.lower():
+                return enrolment
+        return None
 
     def __repr__(self):
         """

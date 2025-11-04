@@ -15,6 +15,7 @@ except (NameError, AttributeError):
 from src.services.interfaces import IGradePolicy
 from src.models.enrolment import Grade
 
+
 # A concrete class 'DefaultGradePolicy' is created that
 # inherits from the abstract 'IGradePolicy'
 class DefaultGradePolicy(IGradePolicy):
@@ -77,3 +78,11 @@ class DefaultGradePolicy(IGradePolicy):
 
         passing_grades = [Grade.HD, Grade.D, Grade.C, Grade.P]
         return grade in passing_grades
+
+    # --- Compatibility shim for older callers ---
+    def calculate_grade(self, mark):
+        """
+        Backwards-compatible alias for systems that call `calculate_grade(mark)`.
+        Delegates to `get_grade_for_mark(mark)`.
+        """
+        return self.get_grade_for_mark(mark)
