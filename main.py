@@ -28,8 +28,7 @@ def main():
         
         auth_service = AuthService(data_store, id_generator)
         enrolment_service = EnrolmentService(data_store, grade_policy, id_generator)
-        reporting_service = ReportingService(data_store)
-        
+        reporting_service = ReportingService(data_store, grade_policy)        
         auth_controller = AuthController(auth_service)
         enrolment_controller = EnrolmentController(enrolment_service)
         admin_controller = AdminController(data_store, reporting_service)

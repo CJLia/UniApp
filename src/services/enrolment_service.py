@@ -1,6 +1,9 @@
+import random
+import re
 import sys
 import os
 from pathlib import Path
+import hashlib
 
 try:
     current_file = Path(__file__).resolve()
@@ -12,21 +15,13 @@ except (NameError, AttributeError):
     if str(cwd) not in sys.path:
         sys.path.insert(0, str(cwd))
 
-import hashlib
-
 from src.services.interfaces import (
-    IEnrolmentService,
-    IDataStore,
-    IGradePolicy
+    IEnrolmentService
 )
 
 # Import the models this service will interact with
 from src.models.student import Student
-from src.models.subject import Subject
 from src.models.enrolment import Enrolment
-
-# Import utility classes
-from src.utils.id_generator import IdGenerator
 
 # Import custom exceptions
 from src.utils.exceptions import (
@@ -37,6 +32,10 @@ from src.utils.exceptions import (
     NotEnrolledException,
     InvalidMarkException
 )
+
+# Password policy (spec): start uppercase + ≥5 letters + ≥3 digits
+_PWD_RULE = r"^[A-Z][A-Za-z]{4,}\d{3,}$"
+_SALT = "cli_uni_app_salt"
 
 class EnrolmentService(IEnrolmentService):
     """
@@ -131,6 +130,16 @@ class EnrolmentService(IEnrolmentService):
         raise SubjectNotFoundException(
             "Subject with code '{code}' not found.".format(code=subject_code)
         )
+    
+    def list_available_subjects(self, student_id):
+        """
+        Return Subject objects the student is NOT yet enrolled in.
+        """
+        student = self._get_student_by_id(student_id)
+        all_subs = self._data_store.get_all_subjects() or []
+        enrolled = {e.subject.id for e in getattr(student, "enrolments", [])}
+        return [s for s in all_subs if getattr(s, "id", None) not in enrolled]
+
 
     def enrol(self, student_id, subject_code):
         """
@@ -154,7 +163,7 @@ class EnrolmentService(IEnrolmentService):
         student = self._get_student_by_id(student_id)
         subject = self._get_subject_by_code(subject_code)
 
-        # --- Validation Step 2: Check Max Enrolment Limit ---
+        # --- Validation Step 2: Check Max 4 subject Enrolment Limit ---
         if len(student.enrolments) >= Student.MAX_ENROLMENTS:
             raise MaxSubjectsExceededException(
                 "Student {id} has reached the maximum of 4 enrolments."
@@ -169,19 +178,19 @@ class EnrolmentService(IEnrolmentService):
                     .format(id=student_id, code=subject_code)
                 )
 
-        # --- Creation Step: Create new Enrolment ---
-        # Note: The design requires a unique ID for enrolments.
-        # For simplicity, a simple counter or a more specific
-        # generator could be used. Here, the student ID + subject
-        # code is used as a simple unique key.
-        # A more robust ID generator would be ideal in a
-        # full implementation.
-        enrolment_id = "{sid}-{scode}".format(sid=student_id,
-                                             scode=subject_code)
+        # --- Step 4: Create new Enrolment ID ---
+        enrolment_id = f"{student_id}-{subject_code}"
+        
+        # --- Step 5: Assign random mark and grade ---
+        mark = random.randint(25,100)
+        grade = self._grade_policy.get_grade_for_mark(mark)
         
         new_enrolment = Enrolment(
-            id=enrolment_id,
-            subject=subject
+            id=enrolment_id,          # keep whatever you already assign
+            subject=subject,          # Subject object you found by code
+            mark=mark,
+            grade=grade
+
         )
 
         # --- Persistence Step 1: Update Student Model ---
@@ -297,29 +306,15 @@ class EnrolmentService(IEnrolmentService):
             InvalidPasswordException: If the new password is not
                                       strong enough.
         """
-        # Note: This method re-uses the password hashing logic
-        # from AuthService. In a real system, this hashing
-        # logic would be broken out into its own 'IPasswordHasher'
-        # service and injected into both AuthService and
-        # EnrolmentService to avoid code duplication.
-        # For this project, a simple re-implementation
-        # is sufficient.
-
-        # --- Validation Step 1: Validate Password Strength ---
-        # This re-uses the static method from the Validator
-        # if not Validator.is_strong_password(new_password):
-        #     raise InvalidPasswordException(
-        #         "New password does not meet strength requirements."
-        #     )
-        # (This is commented out to match the 'change_password' in
-        # the base 'Student' class, which has no validation.
-        # This service method just handles hashing and saving.)
 
         # --- Hashing Step: Hash New Password ---
-        # This logic is duplicated from AuthService.
-        salt = "cli_uni_app_salt"
-        salted_password = (new_password + salt).encode('utf-8')
-        new_password_hash = hashlib.sha256(salted_password).hexdigest()
+        if not re.match(_PWD_RULE, new_password):
+            raise ValueError(
+                "Password must start uppercase, have ≥5 letters, then ≥3 digits (e.g., Abcde123)."
+            )
+
+        salted = (new_password + _SALT).encode("utf-8")
+        new_hash = hashlib.sha256(salted).hexdigest()
 
         # --- Persistence Step 1: Get User ---
         # This uses the base 'get_user_by_id' logic, as this
@@ -332,7 +327,7 @@ class EnrolmentService(IEnrolmentService):
         # The Student model's 'change_password' method
         # (inherited from User and implemented in Student)
         # updates its internal hash.
-        student.change_password(new_password_hash)
+        student.change_password(new_hash)
 
         # --- Persistence Step 3: Save to Data Store ---
         self._data_store.update_user(student)

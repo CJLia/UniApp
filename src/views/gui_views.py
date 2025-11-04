@@ -11,15 +11,24 @@ It does NOT contain any business logic. It only:
 3.  Calls the appropriate controller method when a user acts.
 4.  Receives a result from the controller and displays it.
 """
+import sys
+from pathlib import Path
+
+# gui_views.py is .../project/src/views/gui_views.py
+# parents[2] = project root (the one that contains 'src')
+ROOT = Path(__file__).resolve().parents[2]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 import tkinter as tk
 from tkinter import ttk
 from tkinter import messagebox
+import traceback  # useful for debugging startup issues
 
 # Import the models to check the type of the logged-in user
-# This relies on 'src/models/user.py' being named correctly
-from src.models.student import Student
+from src.models.student import (Student)
 from src.models.admin import Admin
+
 
 class GUIView:
     """
@@ -60,7 +69,11 @@ class GUIView:
         self.root.grid_columnconfigure(0, weight=1)
 
         # Start by showing the login screen
-        self.show_login_frame()
+        try:
+            self.show_login_frame()
+        except Exception:
+            print(" Error while loading login frame:")
+            traceback.print_exc()
 
     def _clear_current_frame(self):
         """Destroys the currently active frame."""
@@ -425,6 +438,7 @@ class StudentMenuFrame(BaseFrame):
         
         # --- Menu Buttons ---
         self.create_menu_button(menu_panel, "My Enrolments", self.show_enrolments)
+        self.create_menu_button(menu_panel, "Available Subjects", self.show_available_subjects)
         self.create_menu_button(menu_panel, "Enrol in Subject", self.show_enrol)
         self.create_menu_button(menu_panel, "Drop Subject", self.show_drop)
         self.create_menu_button(menu_panel, "Change Password", self.show_change_password)
@@ -477,6 +491,9 @@ class StudentMenuFrame(BaseFrame):
     
     def show_enrolments(self):
         self._show_content_frame(StudentEnrolmentsFrame, self.student)
+
+    def show_available_subjects(self):
+        self._show_content_frame(StudentAvailableSubjectsFrame, self.student)
         
     def show_enrol(self):
         self._show_content_frame(StudentEnrolFrame, self.student)
@@ -529,6 +546,58 @@ class StudentEnrolmentsFrame(BaseFrame):
             
             tree.pack(fill=tk.BOTH, expand=True, pady=10)
 
+
+class StudentAvailableSubjectsFrame(BaseFrame):
+    """List all available subjects; allow enrolling with one click."""
+    def __init__(self, parent, view, student):
+        super().__init__(parent, view)
+        self.student = student
+
+        ttk.Label(self, text="Available Subjects", style='Header.TLabel').pack(pady=10)
+
+        box = ttk.Labelframe(self, text="Subjects")
+        box.pack(fill="both", expand=True, padx=10, pady=10)
+
+        self.tree = ttk.Treeview(box, columns=("code", "name"), show="headings", height=10)
+        self.tree.heading("code", text="Code")
+        self.tree.heading("name", text="Name")
+        self.tree.column("code", width=100, anchor=tk.W)
+        self.tree.column("name", width=320, anchor=tk.W)
+        self.tree.pack(fill="both", expand=True, padx=8, pady=(8, 6))
+
+        btns = ttk.Frame(box)
+        btns.pack(fill="x", padx=8, pady=(4, 8))
+        ttk.Button(btns, text="Enrol in Selected", command=self._on_enrol_selected).pack(side=tk.RIGHT)
+
+        self._refresh()
+
+    def _refresh(self):
+        # Use enrolment_controller to get only subjects NOT yet enrolled
+        ok, data = self.view.enrolment_controller.list_available_subjects(self.student.id)
+        for iid in self.tree.get_children():
+            self.tree.delete(iid)
+
+        if ok and data:
+            for code, name in data:
+                self.tree.insert("", "end", values=(code, name))
+        else:
+            # show nothing if error or empty
+            pass
+
+    def _on_enrol_selected(self):
+        sel = self.tree.selection()
+        if not sel:
+            self.view.show_error("Error", "Please select a subject to enrol.")
+            return
+        code = self.tree.item(sel[0], "values")[0]
+        success, error = self.view.enrolment_controller.enrol_student(self.student.id, code)
+        if error:
+            self.view.show_error("Enrolment Failed", error)
+        else:
+            self.view.show_info("Success", f"Enrolled in {code}.")
+            self.view.show_main_menu()
+
+
 class StudentEnrolFrame(BaseFrame):
     """Form for a student to enrol in a new subject."""
     def __init__(self, parent, view, student):
@@ -564,6 +633,7 @@ class StudentEnrolFrame(BaseFrame):
             self.view.show_info("Success", f"Successfully enrolled in {code}.")
             # Refresh the main menu to reload the parent frame
             self.view.show_main_menu()
+
 
 class StudentDropFrame(BaseFrame):
     """Form for a student to drop an enrolled subject."""
@@ -620,6 +690,7 @@ class StudentDropFrame(BaseFrame):
             # Refresh the main menu to reload the parent frame
             self.view.show_main_menu()
             
+
 class ChangePasswordFrame(BaseFrame):
     """Form for a user to change their password."""
     def __init__(self, parent, view, user):
@@ -707,7 +778,8 @@ class AdminMenuFrame(BaseFrame):
         self.create_menu_button(menu_panel, "View All Students", self.show_all_students)
         self.create_menu_button(menu_panel, "Remove Student", self.show_remove_student)
         self.create_menu_button(menu_panel, "Set Student Mark", self.show_set_mark)
-        
+        self.create_menu_button(menu_panel, "Manage Subjects", self.show_manage_subjects)
+
         ttk.Separator(menu_panel, orient='horizontal').pack(fill='x', pady=10, padx=10)
 
         self.create_menu_button(menu_panel, "Pass/Fail Report", self.show_pass_fail_report)
@@ -770,6 +842,9 @@ class AdminMenuFrame(BaseFrame):
     def show_set_mark(self):
         self._show_content_frame(AdminSetMarkFrame)
 
+    def show_manage_subjects(self):
+        self._show_content_frame(AdminManageSubjectsFrame)
+
     def show_pass_fail_report(self):
         self._show_content_frame(AdminPassFailFrame)
 
@@ -816,6 +891,7 @@ class AdminAllStudentsFrame(BaseFrame):
                 )
             tree.pack(fill=tk.BOTH, expand=True, pady=10)
             
+
 class AdminRemoveStudentFrame(BaseFrame):
     """Form for an admin to remove a student."""
     def __init__(self, parent, view):
@@ -849,6 +925,7 @@ class AdminRemoveStudentFrame(BaseFrame):
         else:
             self.view.show_info("Success", f"Student {student_id} removed.")
             self.view.show_main_menu() # Refresh
+
 
 class AdminSetMarkFrame(BaseFrame):
     """Form for an admin to set a student's mark."""
@@ -910,6 +987,70 @@ class AdminSetMarkFrame(BaseFrame):
             self.subject_code_var.set("")
             self.mark_var.set("")
 
+
+class AdminManageSubjectsFrame(BaseFrame):
+    """Admin panel to add, list, and remove subjects."""
+    def __init__(self, parent, view):
+        super().__init__(parent, view)
+
+        ttk.Label(self, text="Manage Subjects", style='Header.TLabel').pack(pady=10)
+
+        box = ttk.Labelframe(self, text="Subjects")
+        box.pack(fill="both", expand=True, padx=10, pady=10)
+
+        self.tree = ttk.Treeview(box, columns=("code", "name"), show="headings", height=8)
+        self.tree.heading("code", text="Code")
+        self.tree.heading("name", text="Name")
+        self.tree.column("code", width=100, anchor=tk.W)
+        self.tree.column("name", width=320, anchor=tk.W)
+        self.tree.pack(fill="x", padx=8, pady=(8, 6))
+
+        row = ttk.Frame(box)
+        row.pack(fill="x", padx=8, pady=(4, 10))
+
+        ttk.Label(row, text="Code (3 digits):").grid(row=0, column=0, sticky="w")
+        self.code_var = tk.StringVar()
+        ttk.Entry(row, textvariable=self.code_var, width=10).grid(row=0, column=1, padx=(6, 16))
+
+        ttk.Label(row, text="Name:").grid(row=0, column=2, sticky="w")
+        self.name_var = tk.StringVar()
+        ttk.Entry(row, textvariable=self.name_var, width=34).grid(row=0, column=3, padx=(6, 16))
+
+        ttk.Button(row, text="Add Subject", command=self._on_add).grid(row=0, column=4)
+        ttk.Button(row, text="Remove Selected", command=self._on_remove).grid(row=0, column=5, padx=(8, 0))
+
+        self._refresh()
+
+    def _refresh(self):
+        for iid in self.tree.get_children():
+            self.tree.delete(iid)
+        ok, data = self.view.admin_controller.list_subjects()
+        if ok and data:
+            for code, name in data:
+                self.tree.insert("", "end", values=(code, name))
+
+    def _on_add(self):
+        code = self.code_var.get().strip()
+        name = self.name_var.get().strip()
+        ok, msg = self.view.admin_controller.add_subject(code, name)
+        messagebox.showinfo("Add Subject" if ok else "Error", msg)
+        if ok:
+            self.code_var.set("")
+            self.name_var.set("")
+            self._refresh()
+
+    def _on_remove(self):
+        sel = self.tree.selection()
+        if not sel:
+            messagebox.showerror("Error", "Please select a subject to remove.")
+            return
+        code = self.tree.item(sel[0], "values")[0]
+        ok, msg = self.view.admin_controller.remove_subject(code)
+        messagebox.showinfo("Remove Subject" if ok else "Error", msg)
+        if ok:
+            self._refresh()
+
+
 class AdminPassFailFrame(BaseFrame):
     """Displays the Pass/Fail report."""
     def __init__(self, parent, view):
@@ -966,6 +1107,7 @@ class AdminPassFailFrame(BaseFrame):
             fail_text.insert(tk.END, f"{s.id} - {s.name}\n")
         fail_text.config(state=tk.DISABLED)
 
+
 class AdminGradeReportFrame(BaseFrame):
     """Displays the report grouping students by average grade."""
     def __init__(self, parent, view):
@@ -1009,6 +1151,7 @@ class AdminGradeReportFrame(BaseFrame):
                 
         text_area.config(state=tk.DISABLED)
 
+
 class AdminClearDataFrame(BaseFrame):
     """Form for an admin to clear all student data."""
     def __init__(self, parent, view):
@@ -1041,4 +1184,3 @@ class AdminClearDataFrame(BaseFrame):
         else:
             self.view.show_info("Success", "All student data has been cleared.")
             self.view.show_main_menu() # Refresh
-

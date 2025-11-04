@@ -84,6 +84,41 @@ class AdminController:
         except Exception as e:
             return f"An unexpected error occurred: {e}"
 
+    def add_subject(self, code: str, name: str):
+        """Admin adds a new subject by code and name."""
+        from src.models.subject import Subject
+        code, name = code.strip(), name.strip()
+        if not (code.isdigit() and len(code) == 3):
+            return False, "Code must be exactly 3 digits (e.g., 101)."
+        if not name:
+            return False, "Subject name required."
+
+        try:
+            if self._data_store.subject_exists(code):
+                return False, f"Subject '{code}' already exists."
+            self._data_store.add_subject(Subject(id=code, name=name))
+            return True, f"Added {code} — {name}."
+        except Exception as e:
+            return False, str(e)
+
+    def remove_subject(self, code: str):
+        code = (code or "").strip()
+        if not (code.isdigit() and len(code) == 3):
+            return False, "Code must be exactly 3 digits."
+        try:
+            self._data_store.remove_subject_cascade(code)
+            return True, f"Removed subject {code}."
+        except Exception as e:
+            return False, str(e)
+
+    def list_subjects(self):
+        """Return list of all subjects for display."""
+        try:
+            subs = self._data_store.get_all_subjects()
+            return True, [(s.id, s.name) for s in subs]
+        except Exception as e:
+            return False, str(e)
+
     def clear_all_data(self):
         """
         Handles a "clear all student data" request.

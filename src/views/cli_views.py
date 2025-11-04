@@ -25,7 +25,7 @@ from src.models.admin import Admin
 from src.models.enrolment import Grade
 
 # Import controllers
-from src.controllers.auth_controller import AuthController
+
 from src.controllers.enrolment_controller import EnrolmentController
 from src.controllers.admin_controller import AdminController
 

@@ -38,7 +38,7 @@ class DefaultGradePolicy(IGradePolicy):
             mark (int): The numerical mark, expected to be between 0-100.
 
         Returns:
-            Grade: The corresponding Grade enum (e.g., Grade.HD, Grade.DN).
+            Grade: The corresponding Grade enum (e.g., Grade.HD, Grade.D).
                    Returns Grade.INVALID if the mark is not valid.
         """
         # First, handle the case of a 'None' or non-integer mark
@@ -47,18 +47,16 @@ class DefaultGradePolicy(IGradePolicy):
         
         # This 'if/elif/else' chain implements the grading scale
         if mark >= 85:
-            return Grade.HD
+            return Grade.HD      # High Distinction
         elif mark >= 75:
-            return Grade.DN
+            return Grade.D       # Distinction
         elif mark >= 65:
-            return Grade.CR
+            return Grade.C       # Credit
         elif mark >= 50:
-            return Grade.PS
+            return Grade.P       # Pass
         elif mark >= 0:
-            # Any mark from 0-49 is considered a Fail
-            return Grade.FL
+            return Grade.F       # Fail
         else:
-            # Any negative mark is also invalid
             return Grade.INVALID
 
     def is_pass_mark(self, mark):
@@ -76,12 +74,6 @@ class DefaultGradePolicy(IGradePolicy):
         """
         # Get the grade for the mark
         grade = self.get_grade_for_mark(mark)
-        
-        # Check if the grade is one of the 'passing' grades.
-        # This is a clean way to check for multiple conditions.
-        passing_grades = [Grade.HD, Grade.DN, Grade.CR, Grade.PS]
-        
-        if grade in passing_grades:
-            return True
-        else:
-            return False
+
+        passing_grades = [Grade.HD, Grade.D, Grade.C, Grade.P]
+        return grade in passing_grades

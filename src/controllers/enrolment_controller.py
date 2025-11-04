@@ -52,6 +52,17 @@ class EnrolmentController:
         """
         self._enrolment_service = enrolment_service
 
+    def list_available_subjects(self, student_id: str):
+        """
+        Returns (ok, data_or_error).
+        On success: list[(code, name)] for subjects the student is NOT yet enrolled in.
+        """
+        try:
+            subs = self._enrolment_service.list_available_subjects(student_id)
+            return True, [(s.id, s.name) for s in (subs or [])]
+        except Exception as e:
+            return False, str(e)
+
     def enrol_student(self, student_id, subject_code):
         """
         Attempts to enrol a student in a subject.

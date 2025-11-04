@@ -55,7 +55,30 @@ class FileDataStore(IDataStore):
         return self._data.get('users', [])
 
     def get_all_subjects(self):
-        return self._data.get('subjects', [])
+        """Return all Subject objects."""
+        return self._data.get("subjects", [])
+    
+    def subject_exists(self, code: str) -> bool:
+        """Check if a subject ID already exists."""
+        return any(getattr(s, "id", None) == code for s in self.get_all_subjects())
+    
+    def add_subject(self, subject):
+        """Add a new subject and save."""
+        subs = self._data.get("subjects", [])
+        if any(getattr(s, "id", None) == subject.id for s in subs):
+            raise ValueError(f"Subject '{subject.id}' already exists.")
+        subs.append(subject)
+        self._data["subjects"] = subs
+        self.save_data()
+
+    def remove_subject(self, code: str):
+        """Remove a subject by code and save."""
+        subs = self._data.get("subjects", [])
+        new_subs = [s for s in subs if getattr(s, "id", None) != code]
+        if len(new_subs) == len(subs):
+            raise ValueError(f"Subject '{code}' not found.")
+        self._data["subjects"] = new_subs
+        self.save_data()
 
     def add_user(self, user):
         self.get_all_users().append(user)

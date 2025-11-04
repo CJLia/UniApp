@@ -1,8 +1,7 @@
 """
-Contains the implementation of the IReportingService interface.
-
-This service is responsible for aggregating and processing data
-to generate reports for administrators.
+Implements the IReportingService interface for generating
+administrative reports such as Pass/Fail partitions and
+Grade groupings for students.
 """
 
 import sys
@@ -19,154 +18,98 @@ except (NameError, AttributeError):
     if str(cwd) not in sys.path:
         sys.path.insert(0, str(cwd))
 
-from src.services.interfaces import IReportingService
-
-# Import models
+from src.services.interfaces import IReportingService, IDataStore, IGradePolicy
 from src.models.student import Student
-from src.models.enrolment import Grade
-
-# Import exceptions
 from src.utils.exceptions import StudentNotFoundException
 
 
 class ReportingService(IReportingService):
     """
-    Implements the IReportingService interface.
-    
-    This service provides reporting functionality for student data,
-    including grouping and partitioning operations.
-    
-    Attributes:
-        _data_store (IDataStore): A reference to the data store.
+    Provides reporting logic for the Admin module.
+    Aggregates student data for Pass/Fail and Grade distribution reports.
     """
-    
-    def __init__(self, data_store):
-        """
-        Initializes the ReportingService.
-        
-        Args:
-            data_store (IDataStore): An object that implements IDataStore.
-        """
+
+    def __init__(self, data_store: IDataStore, grade_policy: IGradePolicy):
         self._data_store = data_store
-    
+        self._grade_policy = grade_policy
+
+    # -------------------------------------------------------------
+    # Internal utility methods
+    # -------------------------------------------------------------
+
     def _get_all_students(self):
-        """Helper method to get only student users."""
+        """Return only Student-type users."""
         all_users = self._data_store.get_all_users()
-        # Filter for Student instances
-        return [user for user in all_users if isinstance(user, Student)]
-    
-    def get_student_enrolments(self, student_id):
+        return [u for u in all_users if isinstance(u, Student)]
+
+    def _avg_mark(self, student: Student):
+        """Compute average mark for a student (returns None if no marks)."""
+        if not getattr(student, "enrolments", None):
+            return None
+        marks = [e.mark for e in student.enrolments if e.mark is not None]
+        if not marks:
+            return None
+        return round(sum(marks) / len(marks))
+
+    # -------------------------------------------------------------
+    # Public methods for the reporting interface
+    # -------------------------------------------------------------
+
+    def get_student_enrolments(self, student_id: str):
         """
-        Gets a detailed list of a single student's enrolments.
-        
-        Args:
-            student_id (str): The ID of the student.
-            
-        Returns:
-            list: A list of Enrolment objects for the student.
-            
-        Raises:
-            StudentNotFoundException: If the student ID is not found.
+        Retrieve all enrolments for a given student.
         """
-        users = self._data_store.get_all_users()
-        
-        for user in users:
-            if isinstance(user, Student) and user.id == student_id:
-                return user.get_enrolments()
-        
-        raise StudentNotFoundException(
-            f"Student with ID '{student_id}' not found."
-        )
-    
+        for u in self._get_all_students():
+            if u.id == student_id:
+                return u.get_enrolments()
+        raise StudentNotFoundException(f"Student with ID '{student_id}' not found.")
+
     def get_pass_fail_partition(self):
         """
-        Partitions all students into two groups: PASS and FAIL.
-        A student is in FAIL if they have failed one or more subjects.
-        A student is in PASS if they have no failed subjects.
-        
-        Returns:
-            dict: A dictionary with 'PASS' and 'FAIL' keys,
-                  each containing a list of Student objects.
+        Partitions students into PASS and FAIL groups based on average mark.
+        Uses the same grade policy logic as Grade Report for consistency.
         """
-        students = self._get_all_students()
-        partitions = {'PASS': [], 'FAIL': []}
-        
-        for student in students:
-            has_failed = False
-            
-            # Check if student has any failed subjects
-            for enrolment in student.get_enrolments():
-                # Check by grade (Grade.F represents Fail)
-                if enrolment.grade == Grade.F:
-                    has_failed = True
-                    break
-                # Also check by mark if grade is not set but mark is
-                elif enrolment.mark is not None and enrolment.mark < 50:
-                    has_failed = True
-                    break
-            
-            if has_failed:
-                partitions['FAIL'].append(student)
+        partitions = {"PASS": [], "FAIL": []}
+
+        for student in self._get_all_students():
+            avg = self._avg_mark(student)
+
+            if avg is None:
+                # No marks yet — optional: treat as FAIL or make a third group
+                partitions["FAIL"].append(student)
+                continue
+
+            if self._grade_policy.is_pass_mark(avg):
+                partitions["PASS"].append(student)
             else:
-                partitions['PASS'].append(student)
-        
+                partitions["FAIL"].append(student)
+
         return partitions
-    
+
     def get_grade_grouping(self):
         """
-        Groups all students based on their average grade.
-        
-        Students are grouped by their overall average grade:
-        - HD: Average >= 85
-        - DN: Average >= 75 and < 85
-        - CR: Average >= 65 and < 75
-        - PS: Average >= 50 and < 65
-        - F: Average < 50 or no marks
-        
-        Returns:
-            dict: A dictionary with grade names as keys,
-                  each containing a list of Student objects.
+        Groups students by their overall average grade (HD/D/C/P/F).
+        Uses average mark + the same grade policy.
         """
-        students = self._get_all_students()
-        
-        groups = {
-            'HD': [],
-            'DN': [],
-            'CR': [],
-            'PS': [],
-            'F': []
-        }
-        
-        for student in students:
-            # Calculate average mark
-            enrolments = student.get_enrolments()
-            marks = [e.mark for e in enrolments if e.mark is not None]
-            
-            if not marks:
-                # No marks available, default to F
-                groups['F'].append(student)
-            else:
-                average = sum(marks) / len(marks)
-                
-                # Determine grade group based on average
-                if average >= 85:
-                    groups['HD'].append(student)
-                elif average >= 75:
-                    groups['DN'].append(student)
-                elif average >= 65:
-                    groups['CR'].append(student)
-                elif average >= 50:
-                    groups['PS'].append(student)
-                else:
-                    groups['F'].append(student)
-        
+        groups = {"HD": [], "D": [], "C": [], "P": [], "F": [], "N/A": []}
+
+        for student in self._get_all_students():
+            avg = self._avg_mark(student)
+
+            if avg is None:
+                groups["N/A"].append(student)
+                continue
+
+            grade = self._grade_policy.get_grade_for_mark(avg)
+            # Ensure grade is a valid Grade enum
+            grade_key = grade.value if hasattr(grade, "value") else str(grade)
+            if grade_key not in groups:
+                grade_key = "N/A"
+
+            groups[grade_key].append(student)
+
         return groups
-    
+
     def get_all_students(self):
-        """
-        Gets a list of all registered students.
-        
-        Returns:
-            list: A list of Student objects.
-        """
+        """Return a list of all registered students."""
         return self._get_all_students()
